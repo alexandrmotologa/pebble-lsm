@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 660" width="1100" height="660">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c121e"/>
+      <stop offset="100%" stop-color="#080c14"/>
+    </linearGradient>
+
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#192334"/>
+      <stop offset="100%" stop-color="#121a28"/>
+    </linearGradient>
+
+    <filter id="win-shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="24" stdDeviation="30" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <style>
+    text {
+      font-family: 'Consolas', 'Courier New', 'DejaVu Sans Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+
+  <!-- Terminal Window Background with Shadow -->
+  <rect x="20" y="20" width="1060" height="620" rx="14" fill="url(#bg-grad)" stroke="#1e293b" stroke-width="1.5" filter="url(#win-shadow)" />
+
+  <!-- Window Header / Title Bar -->
+  <path d="M 20 34 Q 20 20 34 20 L 1066 20 Q 1080 20 1080 34 L 1080 58 L 20 58 Z" fill="url(#header-grad)" />
+  <line x1="20" y1="58" x2="1080" y2="58" stroke="#1e293b" stroke-width="1" />
+
+  <!-- Mac Window Control Dots -->
+  <circle cx="46" cy="39" r="6.5" fill="#ff5f56" stroke="#e0443e" stroke-width="0.5" />
+  <circle cx="68" cy="39" r="6.5" fill="#ffbd2e" stroke="#dea125" stroke-width="0.5" />
+  <circle cx="90" cy="39" r="6.5" fill="#27c93f" stroke="#1aab29" stroke-width="0.5" />
+
+  <!-- Window Title -->
+  <text x="550" y="44" fill="#94a3b8" font-size="12.5px" font-weight="500" text-anchor="middle">PebbleLSM — Embedded RESP Network Server (Connected to redis-cli)</text>
+
+  <!-- Terminal Body Content -->
+  <text x="35" y="90"><tspan fill="#22c55e" font-weight="bold">$ </tspan><tspan fill="#f8fafc" font-weight="normal">java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar server --port 6379 --path ./data</tspan></text>
+<text x="35" y="114"><tspan fill="#64748b" font-weight="normal">[INFO] Initializing PebbleLSM Storage Engine (Virtual Threads enabled)...</tspan></text>
+<text x="35" y="138"><tspan fill="#64748b" font-weight="normal">[INFO] Compaction manager active: Leveled Compaction (L0 threshold=4)</tspan></text>
+<text x="35" y="162"><tspan fill="#22c55e" font-weight="bold">[INFO] PebbleLSM Redis-compatible RESP Server listening on port 6379</tspan></text>
+<text x="35" y="210"><tspan fill="#64748b" font-weight="normal"># Connected via standard redis-cli from external client:</tspan></text>
+<text x="35" y="234"><tspan fill="#22c55e" font-weight="bold">$ </tspan><tspan fill="#f8fafc" font-weight="normal">redis-cli -p 6379</tspan></text>
+<text x="35" y="258"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">PING</tspan></text>
+<text x="35" y="282"><tspan fill="#22c55e" font-weight="normal">PONG</tspan></text>
+<text x="35" y="306"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">SET cluster:leader &quot;node-east-01&quot;</tspan></text>
+<text x="35" y="330"><tspan fill="#22c55e" font-weight="normal">OK</tspan></text>
+<text x="35" y="354"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">GET cluster:leader</tspan></text>
+<text x="35" y="378"><tspan fill="#f1f5f9" font-weight="normal">&quot;node-east-01&quot;</tspan></text>
+<text x="35" y="402"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">MSET config:batch_size &quot;1000&quot; config:sync_wal &quot;true&quot; config:lz4 &quot;enabled&quot;</tspan></text>
+<text x="35" y="426"><tspan fill="#22c55e" font-weight="normal">OK</tspan></text>
+<text x="35" y="450"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">MGET config:batch_size config:lz4 nonexistent</tspan></text>
+<text x="35" y="474"><tspan fill="#cbd5e1" font-weight="normal">1) &quot;1000&quot;</tspan></text>
+<text x="35" y="498"><tspan fill="#cbd5e1" font-weight="normal">2) &quot;enabled&quot;</tspan></text>
+<text x="35" y="522"><tspan fill="#64748b" font-weight="normal">3) (nil)</tspan></text>
+<text x="35" y="546"><tspan fill="#38bdf8" font-weight="bold">127.0.0.1:6379&gt; </tspan><tspan fill="#f8fafc" font-weight="normal">DBSIZE</tspan></text>
+<text x="35" y="570"><tspan fill="#fbbf24" font-weight="normal">(integer) 4</tspan></text>
+
+</svg>

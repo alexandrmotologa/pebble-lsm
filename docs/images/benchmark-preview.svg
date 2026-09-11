@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 540" width="1100" height="540">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c121e"/>
+      <stop offset="100%" stop-color="#080c14"/>
+    </linearGradient>
+
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#192334"/>
+      <stop offset="100%" stop-color="#121a28"/>
+    </linearGradient>
+
+    <linearGradient id="pebble-bar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f5ff"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <linearGradient id="rocksdb-bar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+
+    <filter id="win-shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="24" stdDeviation="30" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <style>
+    .label { font-family: 'Consolas', 'DejaVu Sans Mono', monospace; font-size: 14px; fill: #94a3b8; font-weight: 500; }
+    .val { font-family: 'Consolas', 'DejaVu Sans Mono', monospace; font-size: 15px; fill: #f8fafc; font-weight: bold; }
+    .title { font-family: 'Segoe UI', 'Inter', sans-serif; font-size: 18px; fill: #f8fafc; font-weight: 700; }
+    .subtitle { font-family: 'Segoe UI', 'Inter', sans-serif; font-size: 13px; fill: #64748b; }
+    .badge { font-family: 'Segoe UI', 'Inter', sans-serif; font-size: 12px; fill: #22c55e; font-weight: 600; }
+  </style>
+
+  <!-- Container -->
+  <rect x="20" y="20" width="1060" height="500" rx="14" fill="url(#bg-grad)" stroke="#1e293b" stroke-width="1.5" filter="url(#win-shadow)" />
+
+  <!-- Header -->
+  <path d="M 20 34 Q 20 20 34 20 L 1066 20 Q 1080 20 1080 34 L 1080 60 L 20 60 Z" fill="url(#header-grad)" />
+  <line x1="20" y1="60" x2="1080" y2="60" stroke="#1e293b" stroke-width="1" />
+  <circle cx="46" cy="40" r="6.5" fill="#ff5f56" />
+  <circle cx="68" cy="40" r="6.5" fill="#ffbd2e" />
+  <circle cx="90" cy="40" r="6.5" fill="#27c93f" />
+  <text x="550" y="45" fill="#94a3b8" font-family="'Consolas', monospace" font-size="12.5px" text-anchor="middle">Benchmark Harness: PebbleLSM vs RocksDB JNI (v8.10.0)</text>
+
+  <!-- Title Section -->
+  <text x="50" y="105" class="title">Random Point Lookup Throughput</text>
+  <text x="50" y="128" class="subtitle">50,000 random point reads against 100,000 pre-populated keys with 4KB block cache and Bloom filter</text>
+
+  <!-- Metric 1: Read Throughput -->
+  <!-- PebbleLSM Bar -->
+  <text x="50" y="175" class="label">PebbleLSM (Java 21)</text>
+  <rect x="230" y="156" width="600" height="28" rx="6" fill="url(#pebble-bar)" />
+  <text x="845" y="176" class="val" fill="#00f5ff">164,967 ops/sec</text>
+  <rect x="990" y="158" width="65" height="24" rx="4" fill="#052e16" stroke="#22c55e" stroke-width="1" />
+  <text x="1000" y="174" class="badge">+16.7%</text>
+
+  <!-- RocksDB Bar -->
+  <text x="50" y="225" class="label">RocksDB (C++ JNI)</text>
+  <rect x="230" y="206" width="514" height="28" rx="6" fill="url(#rocksdb-bar)" />
+  <text x="760" y="226" class="val">141,399 ops/sec</text>
+
+  <line x1="50" y1="265" x2="1050" y2="265" stroke="#1e293b" stroke-width="1" />
+
+  <!-- Metric 2: Sequential Write Throughput -->
+  <text x="50" y="305" class="title">Sequential Write Throughput</text>
+  <text x="50" y="328" class="subtitle">100,000 sequential put operations with Write-Ahead Log (WAL) sync</text>
+
+  <!-- PebbleLSM Write Bar -->
+  <text x="50" y="375" class="label">PebbleLSM (Java 21)</text>
+  <rect x="230" y="356" width="445" height="28" rx="6" fill="url(#pebble-bar)" />
+  <text x="690" y="376" class="val" fill="#00f5ff">77,516 ops/sec</text>
+
+  <!-- RocksDB Write Bar -->
+  <text x="50" y="425" class="label">RocksDB (C++ JNI)</text>
+  <rect x="230" y="406" width="600" height="28" rx="6" fill="url(#rocksdb-bar)" />
+  <text x="845" y="426" class="val">104,765 ops/sec</text>
+
+  <!-- Footnote -->
+  <text x="50" y="480" class="subtitle">Hardware: Intel/AMD x86_64, NVMe PCIe 4.0 SSD, OpenJDK 21 LTS, single-thread client pipeline.</text>
+</svg>

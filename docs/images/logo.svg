@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <clipPath id="squircle-clip">
+      <rect x="24" y="24" width="976" height="976" rx="220" />
+    </clipPath>
+
+    <!-- Gradients -->
+    <linearGradient id="cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f5ff"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <linearGradient id="amber-core" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <linearGradient id="plate-light" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+
+    <linearGradient id="plate-mid" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+
+    <linearGradient id="plate-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <filter id="subtle-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000000" flood-opacity="0.18" />
+    </filter>
+  </defs>
+
+  <!-- Luxury White Squircle Container -->
+  <rect x="24" y="24" width="976" height="976" rx="220" fill="#ffffff" stroke="#e2e8f0" stroke-width="6" />
+
+  <g clip-path="url(#squircle-clip)">
+    <g transform="translate(512, 512)" filter="url(#subtle-shadow)">
+
+      <!-- Hexagonal Architectural Gateway Frame -->
+      <polygon points="
+        0,-390
+        338,-195
+        338,195
+        0,390
+        -338,195
+        -338,-195
+      " fill="#080c14" stroke="#0f172a" stroke-width="36" stroke-linejoin="round" />
+
+      <!-- Inner Dashed Cyan Gateway Accent -->
+      <polygon points="
+        0,-355
+        307,-177
+        307,177
+        0,355
+        -307,177
+        -307,-177
+      " fill="none" stroke="#00f5ff" stroke-width="4" opacity="0.45" stroke-dasharray="16, 12" />
+
+      <!-- Watertight Solid Obsidian Base Silhouette -->
+      <path d="
+        M 0 -300
+        L 60 -290 L 110 -250 L 150 -190 L 190 -120 L 250 -40 L 270 60 L 260 170 L 220 260 L 140 325 L 0 355
+        L -140 325 L -220 260 L -260 170 L -270 60 L -250 -40 L -190 -120 L -150 -190 L -110 -250 L -60 -290
+        Z
+      " fill="#070a10" />
+
+      <!-- ==================== TIER 3: L2 COMPACTED BASE FOUNDATION ==================== -->
+      <!-- Left Foundation Plate -->
+      <polygon points="0,355 -140,325 -220,260 -150,195 0,270" fill="#131d2e" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="-150,195 -220,260 -260,170 -190,130" fill="#0f172a" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <!-- Right Foundation Plate (Lit) -->
+      <polygon points="0,355 140,325 220,260 150,195 0,270" fill="#1e293b" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="150,195 220,260 260,170 190,130" fill="#182234" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- Base Neon Strata Rail -->
+      <line x1="-140" y1="325" x2="0" y2="270" stroke="#00f5ff" stroke-width="2.5" opacity="0.65" />
+      <line x1="140" y1="325" x2="0" y2="270" stroke="#00f5ff" stroke-width="2.5" opacity="0.65" />
+
+      <!-- ==================== TIER 2: L1 PARTITIONED STRATA SHIELDS ==================== -->
+      <!-- Left Mid Armor -->
+      <polygon points="0,270 -150,195 -190,130 -105,80 0,145" fill="#182234" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="-190,130 -260,170 -270,60 -195,15 -105,80" fill="#0d1522" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <!-- Right Mid Armor (Lit) -->
+      <polygon points="0,270 150,195 190,130 105,80 0,145" fill="#2d3748" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="190,130 260,170 270,60 195,15 105,80" fill="#1e293b" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- Mid Neon Strata Rail -->
+      <line x1="-190" y1="130" x2="0" y2="145" stroke="#00f5ff" stroke-width="2.5" opacity="0.5" />
+      <line x1="190" y1="130" x2="0" y2="145" stroke="#00f5ff" stroke-width="2.5" opacity="0.5" />
+
+      <!-- ==================== TIER 1: L0 IMMUTABLE FLUSH SHIELDS ==================== -->
+      <!-- Left Shoulder Plate -->
+      <polygon points="0,145 -105,80 -195,15 -250,-40 -160,-75 0,-15" fill="#24334a" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="-160,-75 -250,-40 -190,-120 -130,-130" fill="#131d2e" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <!-- Right Shoulder Plate (Lit) -->
+      <polygon points="0,145 105,80 195,15 250,-40 160,-75 0,-15" fill="#475569" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="160,-75 250,-40 190,-120 130,-130" fill="#334155" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- ==================== CENTRAL IMMUTABLE PEBBLE HEART ==================== -->
+      <!-- Crystal Octahedron Core representing atomic transaction durability -->
+      <polygon points="0,40 -40,95 0,150 40,95" fill="url(#amber-core)" stroke="#070a10" stroke-width="2.5" />
+      <polygon points="0,40 -40,95 0,95" fill="#f59e0b" opacity="0.5" />
+      <polygon points="0,40 40,95 0,95" fill="#fef08a" opacity="0.75" />
+
+      <!-- ==================== DORSAL MANTLE & NECK COLLAR ==================== -->
+      <!-- Neck Shield -->
+      <polygon points="0,-15 -130,-130 -85,-180 0,-125" fill="#2d3748" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="0,-15 130,-130 85,-180 0,-125" fill="#4a5568" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- ==================== PANGOLIN / TITAN HEAD & BROW ==================== -->
+      <!-- Lateral Cheeks / Flanges -->
+      <polygon points="0,-125 -85,-180 -130,-215 -65,-230 0,-190" fill="#1e293b" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="0,-125 85,-180 130,-215 65,-230 0,-190" fill="#3b485d" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- Armored Cranial Crown (Sweeping Brow Plates) -->
+      <polygon points="0,-190 -65,-230 -90,-280 0,-300" fill="#293548" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+      <polygon points="0,-190 65,-230 90,-280 0,-300" fill="#475569" stroke="#070a10" stroke-width="3" stroke-linejoin="round" />
+
+      <!-- Protective Swept Horn Crests -->
+      <polygon points="-90,-280 -135,-240 -105,-220" fill="#182234" stroke="#070a10" stroke-width="2.5" stroke-linejoin="round" />
+      <polygon points="90,-280 135,-240 105,-220" fill="#334155" stroke="#070a10" stroke-width="2.5" stroke-linejoin="round" />
+
+      <!-- Refined Aerodynamic Muzzle & Titanium Nasal Bridge -->
+      <polygon points="0,-190 -35,-200 -20,-145 0,-135" fill="#1a202c" stroke="#070a10" stroke-width="2" stroke-linejoin="round" />
+      <polygon points="0,-190 35,-200 20,-145 0,-135" fill="#334155" stroke="#070a10" stroke-width="2" stroke-linejoin="round" />
+      <!-- Lateral Whisker/Jaw Facets (Titanium Slate, NO buck teeth) -->
+      <polygon points="-35,-200 -65,-185 -20,-145" fill="#24334a" stroke="#070a10" stroke-width="2" />
+      <polygon points="35,-200 65,-185 20,-145" fill="#475569" stroke="#070a10" stroke-width="2" />
+
+      <!-- ==================== PREDATORY ALMOND OPTICS (CYAN) ==================== -->
+      <!-- Left Eye: Geometric Almond Socket angled upward with Cyan Glow -->
+      <polygon points="-36,-215 -74,-232 -58,-205" fill="#05070a" stroke="#0b0f19" stroke-width="2" stroke-linejoin="round" />
+      <polygon points="-40,-216 -68,-229 -56,-208" fill="url(#cyan-glow)" />
+      <polygon points="-48,-221 -58,-225 -52,-214" fill="#ffffff" opacity="0.95" />
+
+      <!-- Right Eye (Symmetrical) -->
+      <polygon points="36,-215 74,-232 58,-205" fill="#05070a" stroke="#0b0f19" stroke-width="2" stroke-linejoin="round" />
+      <polygon points="40,-216 68,-229 56,-208" fill="url(#cyan-glow)" />
+      <polygon points="48,-221 58,-225 52,-214" fill="#ffffff" opacity="0.95" />
+
+      <!-- Telemetry Geometric Accent Nodes -->
+      <circle cx="0" cy="-300" r="3.5" fill="#00f5ff" />
+      <circle cx="-90" cy="-280" r="3" fill="#00f5ff" opacity="0.8" />
+      <circle cx="90" cy="-280" r="3" fill="#00f5ff" opacity="0.8" />
+      <circle cx="-130" cy="-215" r="3" fill="#00f5ff" opacity="0.7" />
+      <circle cx="130" cy="-215" r="3" fill="#00f5ff" opacity="0.7" />
+      <circle cx="0" cy="355" r="4" fill="#00f5ff" />
+
+    </g>
+  </g>
+</svg>

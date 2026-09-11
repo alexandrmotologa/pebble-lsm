@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 600" width="1100" height="600">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c121e"/>
+      <stop offset="100%" stop-color="#080c14"/>
+    </linearGradient>
+
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#192334"/>
+      <stop offset="100%" stop-color="#121a28"/>
+    </linearGradient>
+
+    <filter id="win-shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="24" stdDeviation="30" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <style>
+    text {
+      font-family: 'Consolas', 'Courier New', 'DejaVu Sans Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+
+  <!-- Terminal Window Background with Shadow -->
+  <rect x="20" y="20" width="1060" height="560" rx="14" fill="url(#bg-grad)" stroke="#1e293b" stroke-width="1.5" filter="url(#win-shadow)" />
+
+  <!-- Window Header / Title Bar -->
+  <path d="M 20 34 Q 20 20 34 20 L 1066 20 Q 1080 20 1080 34 L 1080 58 L 20 58 Z" fill="url(#header-grad)" />
+  <line x1="20" y1="58" x2="1080" y2="58" stroke="#1e293b" stroke-width="1" />
+
+  <!-- Mac Window Control Dots -->
+  <circle cx="46" cy="39" r="6.5" fill="#ff5f56" stroke="#e0443e" stroke-width="0.5" />
+  <circle cx="68" cy="39" r="6.5" fill="#ffbd2e" stroke="#dea125" stroke-width="0.5" />
+  <circle cx="90" cy="39" r="6.5" fill="#27c93f" stroke="#1aab29" stroke-width="0.5" />
+
+  <!-- Window Title -->
+  <text x="550" y="44" fill="#94a3b8" font-size="12.5px" font-weight="500" text-anchor="middle">PebbleLSM — Diagnostics TUI HUD (java -jar pebble-lsm.jar tui)</text>
+
+  <!-- Terminal Body Content -->
+  <text x="35" y="90"><tspan fill="#00f5ff" font-weight="bold">================================================================================</tspan></text>
+<text x="35" y="114"><tspan fill="#00f5ff" font-weight="bold">  PebbleLSM — Embedded Storage Engine Diagnostics HUD</tspan></text>
+<text x="35" y="138"><tspan fill="#00f5ff" font-weight="bold">================================================================================</tspan></text>
+<text x="35" y="186"><tspan fill="#f8fafc" font-weight="bold">[ In-Memory Tier ]</tspan></text>
+<text x="35" y="210"><tspan fill="#94a3b8" font-weight="normal">  Active MemTable : </tspan><tspan fill="#22c55e" font-weight="bold">148,290 entries</tspan><tspan fill="#64748b" font-weight="normal"> (</tspan><tspan fill="#fbbf24" font-weight="bold">18.54 MB</tspan><tspan fill="#64748b" font-weight="normal"> / 32.00 MB) [</tspan><tspan fill="#00f5ff" font-weight="bold">================</tspan><tspan fill="#475569" font-weight="normal">--------</tspan><tspan fill="#64748b" font-weight="normal">]</tspan></text>
+<text x="35" y="258"><tspan fill="#f8fafc" font-weight="bold">[ On-Disk LSM Hierarchy ]</tspan></text>
+<text x="35" y="282"><tspan fill="#94a3b8" font-weight="normal">  Level 0 (Overlapping) : </tspan><tspan fill="#22c55e" font-weight="bold">3 files</tspan><tspan fill="#94a3b8" font-weight="normal"> (threshold: 4) | Size: 11.85 MB</tspan></text>
+<text x="35" y="306"><tspan fill="#94a3b8" font-weight="normal">  Level 1 (Partitioned) : </tspan><tspan fill="#38bdf8" font-weight="bold">6 files</tspan><tspan fill="#94a3b8" font-weight="normal"> | Size: 9.42 MB / 10.00 MB [</tspan><tspan fill="#00f5ff" font-weight="bold">====================</tspan><tspan fill="#64748b" font-weight="normal">]</tspan></text>
+<text x="35" y="330"><tspan fill="#94a3b8" font-weight="normal">  Level 2 (Compacted)   : </tspan><tspan fill="#38bdf8" font-weight="bold">18 files</tspan><tspan fill="#94a3b8" font-weight="normal"> | Size: 36.80 MB / 100.00 MB [</tspan><tspan fill="#00f5ff" font-weight="bold">=======</tspan><tspan fill="#475569" font-weight="normal">-------------</tspan><tspan fill="#64748b" font-weight="normal">]</tspan></text>
+<text x="35" y="378"><tspan fill="#f8fafc" font-weight="bold">[ Performance &amp; Cache ]</tspan></text>
+<text x="35" y="402"><tspan fill="#94a3b8" font-weight="normal">  Writes: </tspan><tspan fill="#f1f5f9" font-weight="bold">250,000</tspan><tspan fill="#94a3b8" font-weight="normal">  |  Reads: </tspan><tspan fill="#f1f5f9" font-weight="bold">412,890</tspan><tspan fill="#94a3b8" font-weight="normal">  |  Deletes: </tspan><tspan fill="#f1f5f9" font-weight="bold">1,420</tspan></text>
+<text x="35" y="426"><tspan fill="#94a3b8" font-weight="normal">  Block Cache Hits: </tspan><tspan fill="#f1f5f9" font-weight="bold">398,120</tspan><tspan fill="#94a3b8" font-weight="normal">  |  Misses: </tspan><tspan fill="#f1f5f9" font-weight="bold">14,770</tspan><tspan fill="#94a3b8" font-weight="normal">  |  Hit Ratio: </tspan><tspan fill="#22c55e" font-weight="bold">96.42%</tspan></text>
+<text x="35" y="450"><tspan fill="#94a3b8" font-weight="normal">  Compaction Worker: </tspan><tspan fill="#fbbf24" font-weight="bold">ACTIVE (Leveled Compaction L0 -&gt; L1 on Virtual Thread #42)</tspan></text>
+<text x="35" y="474"><tspan fill="#00f5ff" font-weight="bold">--------------------------------------------------------------------------------</tspan></text>
+<text x="35" y="498"><tspan fill="#94a3b8" font-weight="normal">  Throughput: </tspan><tspan fill="#38bdf8" font-weight="bold">77,516 writes/sec</tspan><tspan fill="#475569" font-weight="normal">  |  </tspan><tspan fill="#22c55e" font-weight="bold">164,967 reads/sec</tspan><tspan fill="#94a3b8" font-weight="normal">  |  Active Virtual Threads: </tspan><tspan fill="#c084fc" font-weight="bold">16</tspan></text>
+
+</svg>
