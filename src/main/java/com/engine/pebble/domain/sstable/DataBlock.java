@@ -12,12 +12,27 @@ import java.util.List;
 
 /**
  * In-memory representation of an immutable 4KB SSTable data block.
+ * Records include key, value, sequence number, operation type, and TTL expiration.
  */
 public final class DataBlock implements Iterable<DataBlock.Record> {
 
-    public record Record(ByteSlice key, ByteSlice value, long sequenceNumber, EntryType type) {
+    public record Record(
+            ByteSlice key,
+            ByteSlice value,
+            long sequenceNumber,
+            EntryType type,
+            long expiresAtTimestamp
+    ) {
+        public Record(ByteSlice key, ByteSlice value, long sequenceNumber, EntryType type) {
+            this(key, value, sequenceNumber, type, 0L);
+        }
+
         public ValueEntry toValueEntry() {
-            return new ValueEntry(value, sequenceNumber, type);
+            return new ValueEntry(value, sequenceNumber, type, expiresAtTimestamp);
+        }
+
+        public boolean isExpired(long now) {
+            return expiresAtTimestamp > 0 && now >= expiresAtTimestamp;
         }
     }
 
@@ -40,10 +55,9 @@ public final class DataBlock implements Iterable<DataBlock.Record> {
     }
 
     /**
-     * Binary searches for the exact key inside this data block.
-     * Returns the matching ValueEntry, or null if not found.
+     * Binary searches for the exact key inside this data block matching maxSequenceNumber.
      */
-    public ValueEntry search(ByteSlice targetKey) {
+    public ValueEntry search(ByteSlice targetKey, long maxSequenceNumber, long now) {
         int low = 0;
         int high = records.size() - 1;
 
@@ -57,11 +71,22 @@ public final class DataBlock implements Iterable<DataBlock.Record> {
             } else if (cmp > 0) {
                 high = mid - 1;
             } else {
-                return record.toValueEntry();
+                // Key found, check sequence number visibility and expiration
+                if (record.sequenceNumber() <= maxSequenceNumber) {
+                    if (record.isExpired(now)) {
+                        return null; // Expired key
+                    }
+                    return record.toValueEntry();
+                }
+                return null;
             }
         }
 
         return null;
+    }
+
+    public ValueEntry search(ByteSlice targetKey) {
+        return search(targetKey, Long.MAX_VALUE, System.currentTimeMillis());
     }
 
     public byte[] serialize() {
@@ -69,7 +94,8 @@ public final class DataBlock implements Iterable<DataBlock.Record> {
         for (Record r : records) {
             int keyLen = r.key().length();
             int valLen = (r.value() != null) ? r.value().length() : 0;
-            totalBytes += (4 + keyLen + 4 + valLen + 8 + 1);
+            // 4 (keyLen) + key + 4 (valLen) + val + 8 (seq) + 8 (expiresAt) + 1 (type)
+            totalBytes += (4 + keyLen + 4 + valLen + 8 + 8 + 1);
         }
 
         ByteBuffer buffer = ByteBuffer.allocate(totalBytes);
@@ -86,6 +112,7 @@ public final class DataBlock implements Iterable<DataBlock.Record> {
             }
 
             buffer.putLong(r.sequenceNumber());
+            buffer.putLong(r.expiresAtTimestamp());
             buffer.put(r.type().code());
         }
 
@@ -112,13 +139,14 @@ public final class DataBlock implements Iterable<DataBlock.Record> {
             }
 
             long seq = buffer.getLong();
+            long expiresAt = buffer.getLong();
             byte typeCode = buffer.get();
 
             ByteSlice key = ByteSlice.of(keyBytes);
             ByteSlice val = ByteSlice.of(valBytes);
             EntryType type = EntryType.fromCode(typeCode);
 
-            list.add(new Record(key, val, seq, type));
+            list.add(new Record(key, val, seq, type, expiresAt));
         }
 
         return new DataBlock(list);

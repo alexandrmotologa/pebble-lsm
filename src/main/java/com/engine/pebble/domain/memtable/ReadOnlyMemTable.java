@@ -24,6 +24,10 @@ public final class ReadOnlyMemTable implements Iterable<Map.Entry<ByteSlice, Val
         return underlying.get(key);
     }
 
+    public ValueEntry get(ByteSlice key, long maxSequenceNumber) {
+        return underlying.get(key, maxSequenceNumber);
+    }
+
     public long approximateBytes() {
         return underlying.approximateBytes();
     }

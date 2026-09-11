@@ -10,28 +10,45 @@ import java.util.Objects;
 
 /**
  * Adapter converting MemTable key-value iterator to an InternalIterator.
+ * Traverses MVCC version chains to select the latest version visible to maxSequenceNumber.
  */
 public class MemTableIterator implements InternalIterator {
 
     private final Iterator<Map.Entry<ByteSlice, ValueEntry>> source;
+    private final long maxSequenceNumber;
     private StorageEntry current;
 
-    public MemTableIterator(Iterator<Map.Entry<ByteSlice, ValueEntry>> source) {
+    public MemTableIterator(Iterator<Map.Entry<ByteSlice, ValueEntry>> source, long maxSequenceNumber) {
         this.source = Objects.requireNonNull(source, "source iterator must not be null");
+        this.maxSequenceNumber = maxSequenceNumber;
         advance();
     }
 
+    public MemTableIterator(Iterator<Map.Entry<ByteSlice, ValueEntry>> source) {
+        this(source, Long.MAX_VALUE);
+    }
+
     private void advance() {
-        if (source.hasNext()) {
-            Map.Entry<ByteSlice, ValueEntry> entry = source.next();
-            current = new StorageEntry(
-                    entry.getKey(),
-                    entry.getValue().value(),
-                    entry.getValue().sequenceNumber(),
-                    entry.getValue().type()
-            );
-        } else {
-            current = null;
+        current = null;
+        while (source.hasNext()) {
+            Map.Entry<ByteSlice, ValueEntry> mapEntry = source.next();
+            ValueEntry entry = mapEntry.getValue();
+
+            // Walk version chain to find the latest version <= maxSequenceNumber
+            while (entry != null && entry.sequenceNumber() > maxSequenceNumber) {
+                entry = entry.previousVersion();
+            }
+
+            if (entry != null) {
+                current = new StorageEntry(
+                        mapEntry.getKey(),
+                        entry.value(),
+                        entry.sequenceNumber(),
+                        entry.type(),
+                        entry.expiresAtTimestamp()
+                );
+                return;
+            }
         }
     }
 

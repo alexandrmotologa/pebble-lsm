@@ -4,6 +4,8 @@ import com.engine.pebble.common.ByteSlice;
 import com.engine.pebble.domain.cache.BlockCache;
 import com.engine.pebble.domain.filter.BloomFilter;
 import com.engine.pebble.domain.model.ValueEntry;
+import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -16,7 +18,7 @@ import java.util.NoSuchElementException;
 /**
  * Reader for immutable SSTable files.
  * Provides logarithmic disk lookups via bounds checking, Bloom filter tests,
- * sparse block index binary search, and optional LRU block caching.
+ * sparse block index binary search, transparent LZ4 block decompression, and LRU block caching.
  */
 public class SSTableReader implements AutoCloseable {
 
@@ -29,6 +31,7 @@ public class SSTableReader implements AutoCloseable {
     private final BlockIndex blockIndex;
     private final BloomFilter bloomFilter;
     private final BlockCache blockCache;
+    private final LZ4FastDecompressor lz4Decompressor = LZ4Factory.fastestInstance().fastDecompressor();
 
     private SSTableReader(
             Path path,
@@ -85,6 +88,10 @@ public class SSTableReader implements AutoCloseable {
     }
 
     public ValueEntry get(ByteSlice key) throws IOException {
+        return get(key, Long.MAX_VALUE);
+    }
+
+    public ValueEntry get(ByteSlice key, long maxSequenceNumber) throws IOException {
         // 1. Min/Max bounds test
         if (footer.minKey() == null || footer.maxKey() == null) {
             return null;
@@ -107,8 +114,8 @@ public class SSTableReader implements AutoCloseable {
         // 4. Data block fetch (cache or disk)
         DataBlock block = readBlock(handle);
 
-        // 5. Binary search inside the block
-        return block.search(key);
+        // 5. Binary search inside the block with snapshot and TTL checking
+        return block.search(key, maxSequenceNumber, System.currentTimeMillis());
     }
 
     public DataBlock readBlock(BlockHandle handle) throws IOException {
@@ -128,7 +135,22 @@ public class SSTableReader implements AutoCloseable {
         }
         buffer.flip();
 
-        DataBlock block = DataBlock.deserialize(buffer);
+        byte compCode = buffer.get();
+        int uncompressedLen = buffer.getInt();
+        int compressedLen = buffer.getInt();
+
+        byte[] rawBlockBytes;
+        if (compCode == CompressionType.LZ4.code()) {
+            byte[] compressedPayload = new byte[compressedLen];
+            buffer.get(compressedPayload);
+            rawBlockBytes = new byte[uncompressedLen];
+            lz4Decompressor.decompress(compressedPayload, 0, rawBlockBytes, 0, uncompressedLen);
+        } else {
+            rawBlockBytes = new byte[uncompressedLen];
+            buffer.get(rawBlockBytes);
+        }
+
+        DataBlock block = DataBlock.deserialize(rawBlockBytes);
         if (blockCache != null) {
             blockCache.put(fileNumber, handle.offset(), block);
         }

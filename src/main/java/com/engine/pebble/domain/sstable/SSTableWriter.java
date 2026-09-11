@@ -3,6 +3,8 @@ package com.engine.pebble.domain.sstable;
 import com.engine.pebble.common.ByteSlice;
 import com.engine.pebble.domain.filter.BloomFilter;
 import com.engine.pebble.domain.model.ValueEntry;
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -17,7 +19,7 @@ import java.util.Map;
 
 /**
  * Writes sorted key-value pairs into an immutable SSTable file.
- * Automatically slices records into 4KB data blocks, builds a sparse index and Bloom filter.
+ * Slices records into 4KB data blocks with optional LZ4 compression, sparse index and Bloom filter.
  */
 public class SSTableWriter {
 
@@ -27,12 +29,28 @@ public class SSTableWriter {
     private final long fileNumber;
     private final int targetBlockSize;
     private final int expectedElements;
+    private final CompressionType compressionType;
+    private final LZ4Compressor lz4Compressor;
 
-    public SSTableWriter(Path path, long fileNumber, int targetBlockSize, int expectedElements) {
+    public SSTableWriter(
+            Path path,
+            long fileNumber,
+            int targetBlockSize,
+            int expectedElements,
+            CompressionType compressionType) {
+
         this.path = path;
         this.fileNumber = fileNumber;
         this.targetBlockSize = Math.max(512, targetBlockSize);
         this.expectedElements = Math.max(1, expectedElements);
+        this.compressionType = (compressionType != null) ? compressionType : CompressionType.NONE;
+        this.lz4Compressor = (this.compressionType == CompressionType.LZ4)
+                ? LZ4Factory.fastestInstance().fastCompressor()
+                : null;
+    }
+
+    public SSTableWriter(Path path, long fileNumber, int targetBlockSize, int expectedElements) {
+        this(path, fileNumber, targetBlockSize, expectedElements, CompressionType.LZ4);
     }
 
     public SSTableMetadata write(Iterator<Map.Entry<ByteSlice, ValueEntry>> iterator) throws IOException {
@@ -54,7 +72,7 @@ public class SSTableWriter {
                 StandardOpenOption.TRUNCATE_EXISTING)) {
 
             List<DataBlock.Record> currentBlockRecords = new ArrayList<>();
-            int currentBlockBytes = 4; // 4 bytes for count
+            int currentBlockBytes = 4;
 
             while (iterator.hasNext()) {
                 Map.Entry<ByteSlice, ValueEntry> entry = iterator.next();
@@ -73,11 +91,12 @@ public class SSTableWriter {
                         key,
                         val.value(),
                         val.sequenceNumber(),
-                        val.type()
+                        val.type(),
+                        val.expiresAtTimestamp()
                 );
                 currentBlockRecords.add(record);
 
-                int recordBytes = 4 + key.length() + 4 + (val.value() != null ? val.value().length() : 0) + 8 + 1;
+                int recordBytes = 4 + key.length() + 4 + (val.value() != null ? val.value().length() : 0) + 8 + 8 + 1;
                 currentBlockBytes += recordBytes;
 
                 if (currentBlockBytes >= targetBlockSize) {
@@ -124,7 +143,7 @@ public class SSTableWriter {
             return new SSTableMetadata(
                     fileNumber,
                     path,
-                    0, // Default level 0 upon initial write
+                    0,
                     entryCount,
                     minKey,
                     maxKey,
@@ -140,10 +159,31 @@ public class SSTableWriter {
 
         DataBlock block = new DataBlock(records);
         byte[] blockBytes = block.serialize();
-        long offset = channel.position();
-        int size = blockBytes.length;
+        byte[] toWrite;
 
-        writeFully(channel, blockBytes);
+        if (compressionType == CompressionType.LZ4 && lz4Compressor != null) {
+            int maxCompressedLength = lz4Compressor.maxCompressedLength(blockBytes.length);
+            byte[] compressed = new byte[maxCompressedLength];
+            int compressedLength = lz4Compressor.compress(blockBytes, 0, blockBytes.length, compressed, 0, maxCompressedLength);
+
+            ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + compressedLength);
+            buf.put(CompressionType.LZ4.code());
+            buf.putInt(blockBytes.length);
+            buf.putInt(compressedLength);
+            buf.put(compressed, 0, compressedLength);
+            toWrite = buf.array();
+        } else {
+            ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + blockBytes.length);
+            buf.put(CompressionType.NONE.code());
+            buf.putInt(blockBytes.length);
+            buf.putInt(0);
+            buf.put(blockBytes);
+            toWrite = buf.array();
+        }
+
+        long offset = channel.position();
+        int size = toWrite.length;
+        writeFully(channel, toWrite);
 
         ByteSlice firstKey = records.get(0).key();
         indexEntries.add(new BlockIndex.Entry(firstKey, new BlockHandle(offset, size)));

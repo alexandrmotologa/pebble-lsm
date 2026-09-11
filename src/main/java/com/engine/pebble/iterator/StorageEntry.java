@@ -13,7 +13,8 @@ public record StorageEntry(
         ByteSlice key,
         ByteSlice value,
         long sequenceNumber,
-        EntryType type
+        EntryType type,
+        long expiresAtTimestamp
 ) implements Comparable<StorageEntry> {
 
     public StorageEntry {
@@ -24,12 +25,20 @@ public record StorageEntry(
         }
     }
 
+    public StorageEntry(ByteSlice key, ByteSlice value, long sequenceNumber, EntryType type) {
+        this(key, value, sequenceNumber, type, 0L);
+    }
+
     public boolean isTombstone() {
         return type == EntryType.DELETE;
     }
 
+    public boolean isExpired(long now) {
+        return expiresAtTimestamp > 0 && now >= expiresAtTimestamp;
+    }
+
     public ValueEntry toValueEntry() {
-        return new ValueEntry(value, sequenceNumber, type);
+        return new ValueEntry(value, sequenceNumber, type, expiresAtTimestamp);
     }
 
     @Override

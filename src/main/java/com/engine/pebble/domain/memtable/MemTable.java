@@ -1,6 +1,7 @@
 package com.engine.pebble.domain.memtable;
 
 import com.engine.pebble.common.ByteSlice;
+import com.engine.pebble.domain.model.EntryType;
 import com.engine.pebble.domain.model.ValueEntry;
 
 import java.util.Iterator;
@@ -11,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * In-memory sorted buffer backed by a ConcurrentSkipListMap.
- * Tracks memory consumption and provides O(log N) operations.
+ * Supports MVCC version chains per key to guarantee snapshot isolation across concurrent writes.
  */
 public class MemTable implements Iterable<Map.Entry<ByteSlice, ValueEntry>> {
 
@@ -26,35 +27,49 @@ public class MemTable implements Iterable<Map.Entry<ByteSlice, ValueEntry>> {
     }
 
     public void put(ByteSlice key, ByteSlice value, long sequenceNumber) {
-        ValueEntry entry = ValueEntry.put(value, sequenceNumber);
-        ValueEntry previous = map.put(key, entry);
+        put(key, value, sequenceNumber, 0L);
+    }
 
-        long newEntryBytes = entry.estimatedBytes(key.length());
-        if (previous == null) {
-            approximateBytes.addAndGet(newEntryBytes);
-            entryCount.incrementAndGet();
-        } else {
-            long prevBytes = previous.estimatedBytes(key.length());
-            approximateBytes.addAndGet(newEntryBytes - prevBytes);
-        }
+    public void put(ByteSlice key, ByteSlice value, long sequenceNumber, long expiresAtTimestamp) {
+        map.compute(key, (k, prev) -> {
+            ValueEntry entry = new ValueEntry(value, sequenceNumber, EntryType.PUT, expiresAtTimestamp, prev);
+            long newEntryBytes = entry.estimatedBytes(key.length());
+            if (prev == null) {
+                approximateBytes.addAndGet(newEntryBytes);
+                entryCount.incrementAndGet();
+            } else {
+                long prevBytes = prev.estimatedBytes(key.length());
+                approximateBytes.addAndGet(newEntryBytes - prevBytes);
+            }
+            return entry;
+        });
     }
 
     public void delete(ByteSlice key, long sequenceNumber) {
-        ValueEntry entry = ValueEntry.delete(sequenceNumber);
-        ValueEntry previous = map.put(key, entry);
-
-        long newEntryBytes = entry.estimatedBytes(key.length());
-        if (previous == null) {
-            approximateBytes.addAndGet(newEntryBytes);
-            entryCount.incrementAndGet();
-        } else {
-            long prevBytes = previous.estimatedBytes(key.length());
-            approximateBytes.addAndGet(newEntryBytes - prevBytes);
-        }
+        map.compute(key, (k, prev) -> {
+            ValueEntry entry = new ValueEntry(ByteSlice.EMPTY, sequenceNumber, EntryType.DELETE, 0L, prev);
+            long newEntryBytes = entry.estimatedBytes(key.length());
+            if (prev == null) {
+                approximateBytes.addAndGet(newEntryBytes);
+                entryCount.incrementAndGet();
+            } else {
+                long prevBytes = prev.estimatedBytes(key.length());
+                approximateBytes.addAndGet(newEntryBytes - prevBytes);
+            }
+            return entry;
+        });
     }
 
     public ValueEntry get(ByteSlice key) {
-        return map.get(key);
+        return get(key, Long.MAX_VALUE);
+    }
+
+    public ValueEntry get(ByteSlice key, long maxSequenceNumber) {
+        ValueEntry curr = map.get(key);
+        while (curr != null && curr.sequenceNumber() > maxSequenceNumber) {
+            curr = curr.previousVersion();
+        }
+        return curr;
     }
 
     public long approximateBytes() {
@@ -82,9 +97,6 @@ public class MemTable implements Iterable<Map.Entry<ByteSlice, ValueEntry>> {
         return map.entrySet().iterator();
     }
 
-    /**
-     * Returns an iterator over keys in range [fromKey, toKey).
-     */
     public Iterator<Map.Entry<ByteSlice, ValueEntry>> scan(ByteSlice fromKey, ByteSlice toKey) {
         if (fromKey == null && toKey == null) {
             return iterator();

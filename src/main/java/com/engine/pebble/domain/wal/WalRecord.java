@@ -10,8 +10,13 @@ public record WalRecord(
         EntryType type,
         long sequenceNumber,
         ByteSlice key,
-        ByteSlice value
+        ByteSlice value,
+        long expiresAtTimestamp
 ) {
+    public WalRecord(EntryType type, long sequenceNumber, ByteSlice key, ByteSlice value) {
+        this(type, sequenceNumber, key, value, 0L);
+    }
+
     public boolean isTombstone() {
         return type == EntryType.DELETE;
     }

@@ -32,7 +32,8 @@ public class SSTableIterator implements InternalIterator {
                     record.key(),
                     record.value(),
                     record.sequenceNumber(),
-                    record.type()
+                    record.type(),
+                    record.expiresAtTimestamp()
             );
         } else {
             current = null;

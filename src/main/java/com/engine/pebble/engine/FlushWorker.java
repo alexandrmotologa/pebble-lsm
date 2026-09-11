@@ -65,7 +65,8 @@ public class FlushWorker implements AutoCloseable {
                 sstPath,
                 fileNumber,
                 options.sstableTargetBlockSize(),
-                frozen.size()
+                frozen.size(),
+                options.compressionType()
         );
 
         writer.write(frozen.iterator());

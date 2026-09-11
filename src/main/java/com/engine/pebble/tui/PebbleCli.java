@@ -2,6 +2,7 @@ package com.engine.pebble.tui;
 
 import com.engine.pebble.engine.PebbleEngine;
 import com.engine.pebble.engine.PebbleOptions;
+import com.engine.pebble.server.RespServer;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -111,6 +112,26 @@ public class PebbleCli implements Callable<Integer> {
         try (PebbleEngine engine = PebbleEngine.open(options)) {
             engine.delete(key.getBytes());
             System.out.println("OK: deleted key '" + key + "'");
+        }
+        return 0;
+    }
+
+    @Command(name = "shell", description = "Launch interactive REPL shell")
+    public int shell() {
+        PebbleShell.run(dbPath);
+        return 0;
+    }
+
+    @Command(name = "server", description = "Launch embedded Redis-compatible RESP TCP server")
+    public int server(
+            @Option(names = {"--port"}, description = "TCP listening port", defaultValue = "6379") int port
+    ) throws Exception {
+        PebbleOptions options = PebbleOptions.builder().dbPath(dbPath).build();
+        try (PebbleEngine engine = PebbleEngine.open(options);
+             RespServer server = new RespServer(engine, port)) {
+            server.start();
+            System.out.println("PebbleLSM RESP Server running on port " + port + ". Press Ctrl+C to stop.");
+            Thread.currentThread().join();
         }
         return 0;
     }

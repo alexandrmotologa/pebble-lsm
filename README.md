@@ -1,6 +1,6 @@
 # PebbleLSM
 
-PebbleLSM is an embedded Log-Structured Merge-tree (LSM) key-value storage engine written in Java 21 LTS. It uses append-only disk writes, an in-memory skip list, immutable sorted string tables, block indexes, and leveled compaction to achieve high write throughput and predictable read latency.
+PebbleLSM is an embedded Log-Structured Merge-tree (LSM) key-value storage engine written in Java 21 LTS. It uses append-only disk writes, an in-memory skip list, immutable sorted string tables, block indexes, leveled compaction, and an embedded RESP network server.
 
 ## Architecture overview
 
@@ -13,35 +13,42 @@ Traditional B-Trees modify disk blocks in place, causing random I/O and lock con
 5. A background compaction manager merges overlapping SSTables across levels (L0 to L1 to L2), sorting keys, discarding superseded versions, and reclaiming space from deleted keys (tombstones).
 
 ```
-[Client Request: put(k, v) / delete(k)]
+[Client Request: put(k, v) / delete(k) / write(batch)]
           │
-          ├──► Write-Ahead Log (WAL) [append-only disk file with CRC32]
+          ├──► Write-Ahead Log (WAL) [append-only disk file with CRC32 framing]
           │
-          └──► Active MemTable [ConcurrentSkipListMap in RAM]
+          └──► Active MemTable [ConcurrentSkipListMap with MVCC version chains]
                      │
                      ▼ (freeze on capacity)
                ReadOnly MemTable
                      │
-                     ▼ (background flush)
-               Level 0 SSTables (overlapping key ranges)
+                     ▼ (background virtual-thread flush)
+               Level 0 SSTables (overlapping key ranges, optional LZ4 blocks)
                      │
                      ▼ (leveled compaction)
                Level 1 SSTables (partitioned, non-overlapping)
                      │
                      ▼ (cascading compaction)
-               Level 2 SSTables (larger capacity)
+               Level 2 SSTables (larger capacity, tombstone purging)
 ```
 
 ## Features
 
-- Java 21 runtime with virtual threads for asynchronous flush and compaction operations.
-- Crash durability with per-record CRC32 verification and automatic recovery on startup.
+- Java 21 runtime with virtual threads for asynchronous flush, compaction, and client network connections.
+- Crash durability with per-record and per-batch CRC32 verification and automatic recovery on startup.
 - Fast point queries using MurmurHash3 Bloom filters (1% false positive rate) and memory-mapped sparse block indexes.
 - K-way merge iterator supporting lexicographically sorted range scans (`scan(fromKey, toKey)`).
-- Concurrent Leveled Compaction worker to minimize read and space amplification.
-- In-memory LRU block cache for hot 4KB SSTable data blocks.
+- Leveled Compaction worker to bound read and space amplification.
+- In-memory LRU block cache for hot SSTable data blocks.
+- Atomic batch operations (`WriteBatch`) written with a single WAL sync.
+- Snapshot isolation (MVCC) providing point-in-time point lookups and range scans.
+- Transparent LZ4 block compression reducing SSTable footprint on disk.
+- Per-record Time-To-Live (TTL) with automatic pruning during reads and compactions.
+- Dynamic write-stall backpressure to prevent L0 file accumulation during burst writes.
+- Interactive JLine3 REPL shell with command history and tab completion.
+- Embedded Redis-compatible RESP server on port 6379, accessible with standard Redis clients (`redis-cli`).
 - Real-time diagnostic terminal UI showing level distribution, write throughput, and compaction metrics.
-- Benchmark module comparing performance directly against RocksDB JNI.
+- Benchmark module comparing throughput and latency against RocksDB JNI.
 
 ## Quick start
 
@@ -58,20 +65,28 @@ cd pebble-lsm
 mvn clean package
 ```
 
+The build produces a shaded standalone JAR file at `target/pebble-lsm-1.0.0-SNAPSHOT.jar`.
+
 ### Basic usage
 
 ```java
+import com.engine.pebble.domain.batch.WriteBatch;
+import com.engine.pebble.domain.model.Snapshot;
+import com.engine.pebble.domain.sstable.CompressionType;
 import com.engine.pebble.engine.PebbleEngine;
 import com.engine.pebble.engine.PebbleOptions;
-import java.nio.file.Path;
+
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
 
 public class Example {
     public static void main(String[] args) throws Exception {
         PebbleOptions options = PebbleOptions.builder()
                 .dbPath(Path.of("./data"))
-                .memTableThresholdBytes(32 * 1024 * 1024) // 32MB
+                .memTableThresholdBytes(32 * 1024 * 1024)
+                .compressionType(CompressionType.LZ4)
                 .l0CompactionThreshold(4)
                 .build();
 
@@ -79,12 +94,32 @@ public class Example {
             byte[] key = "user:1001".getBytes(StandardCharsets.UTF_8);
             byte[] value = "{\"name\":\"Alex\",\"role\":\"engineer\"}".getBytes(StandardCharsets.UTF_8);
 
-            // Put
+            // Point write and read
             engine.put(key, value);
-
-            // Get
             Optional<byte[]> result = engine.get(key);
             result.ifPresent(v -> System.out.println("Found: " + new String(v, StandardCharsets.UTF_8)));
+
+            // Write with Time-To-Live (TTL)
+            byte[] sessionKey = "session:xyz".getBytes(StandardCharsets.UTF_8);
+            byte[] sessionVal = "active".getBytes(StandardCharsets.UTF_8);
+            engine.put(sessionKey, sessionVal, Duration.ofSeconds(60));
+
+            // Atomic batch write
+            try (WriteBatch batch = new WriteBatch()) {
+                batch.put("account:A".getBytes(StandardCharsets.UTF_8), "balance:500".getBytes(StandardCharsets.UTF_8));
+                batch.put("account:B".getBytes(StandardCharsets.UTF_8), "balance:750".getBytes(StandardCharsets.UTF_8));
+                batch.delete("account:C".getBytes(StandardCharsets.UTF_8));
+                engine.write(batch);
+            }
+
+            // Snapshot isolation
+            try (Snapshot snapshot = engine.getSnapshot()) {
+                engine.put(key, "new_value".getBytes(StandardCharsets.UTF_8));
+
+                // Reads from snapshot observe the state at creation time
+                Optional<byte[]> snapValue = engine.get(snapshot, key);
+                System.out.println("Snapshot value: " + new String(snapValue.orElseThrow(), StandardCharsets.UTF_8));
+            }
 
             // Delete
             engine.delete(key);
@@ -93,7 +128,57 @@ public class Example {
 }
 ```
 
-### Running the diagnostic TUI
+### Interactive REPL shell
+
+Launch the interactive shell to run queries, scans, and inspect stats directly:
+
+```bash
+java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar shell --path ./data
+```
+
+Supported shell commands:
+- `put <key> <value> [ttl_seconds]`
+- `get <key>`
+- `delete <key>`
+- `scan [from_key] [to_key] [limit]`
+- `flush`
+- `compact`
+- `stats`
+- `help` / `exit`
+
+### Embedded Redis RESP server
+
+Run PebbleLSM as a standalone network key-value store compatible with Redis:
+
+```bash
+java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar server --port 6379 --path ./data
+```
+
+Connect using standard tools such as `redis-cli`:
+
+```bash
+redis-cli -p 6379 ping
+# PONG
+
+redis-cli -p 6379 set user:1001 "Alice"
+# OK
+
+redis-cli -p 6379 get user:1001
+# "Alice"
+
+redis-cli -p 6379 mget user:1001 user:1002
+# 1) "Alice"
+# 2) (nil)
+
+redis-cli -p 6379 dbsize
+# (integer) 1
+
+redis-cli -p 6379 info
+```
+
+### Diagnostic TUI
+
+Inspect level distribution, live write rates, and compaction progress:
 
 ```bash
 java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar tui --path ./data
@@ -101,11 +186,14 @@ java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar tui --path ./data
 
 ### Running benchmarks
 
-Run sequential write, point lookup, and RocksDB comparison suites:
+Execute the benchmark suite comparing PebbleLSM to RocksDB:
 
 ```bash
 # Sequential write benchmark (1,000,000 operations)
 mvn test-compile exec:java -Dexec.mainClass="com.engine.pebble.benchmarks.SequentialWriteBenchmark"
+
+# Random read benchmark
+mvn test-compile exec:java -Dexec.mainClass="com.engine.pebble.benchmarks.RandomReadBenchmark"
 
 # RocksDB comparison benchmark
 mvn test-compile exec:java -Dexec.mainClass="com.engine.pebble.benchmarks.RocksDbComparisonBenchmark"
@@ -113,9 +201,9 @@ mvn test-compile exec:java -Dexec.mainClass="com.engine.pebble.benchmarks.RocksD
 
 ## Documentation
 
-- [Architecture Guide](docs/architecture.md): Internal design, memory management, and lookup path.
-- [SSTable Format Specification](docs/format-spec.md): Binary file layout, sparse index, and footer format.
-- [Compaction Mechanics](docs/compaction.md): Leveled compaction algorithm, tombstone purging, and manifest updates.
+- [Architecture Guide](docs/architecture.md): Write pipeline, read path, MVCC snapshot isolation, and write stall backpressure.
+- [SSTable Format Specification](docs/format-spec.md): Binary layout, WAL batch framing, LZ4 block compression, and magic footers.
+- [Compaction Mechanics](docs/compaction.md): Leveled compaction algorithm, tombstone purging, and TTL expiration.
 
 ## License
 

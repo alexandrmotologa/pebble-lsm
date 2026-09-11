@@ -11,18 +11,20 @@ import java.util.PriorityQueue;
 /**
  * Multi-way merge iterator across multiple sorted entry streams.
  * Automatically deduplicates duplicate keys by retaining the version with the highest sequence number.
- * Can optionally purge delete tombstones (used when scanning or compacting into the base level).
+ * Supports MVCC snapshot visibility filtering and TTL expiration dropping.
  */
 public class PriorityQueueMergeIterator implements InternalIterator {
 
     private final List<InternalIterator> allIterators;
     private final PriorityQueue<InternalIterator> pq;
     private final boolean dropTombstones;
+    private final long maxSequenceNumber;
     private StorageEntry nextEntry;
 
-    public PriorityQueueMergeIterator(List<InternalIterator> iterators, boolean dropTombstones) {
+    public PriorityQueueMergeIterator(List<InternalIterator> iterators, boolean dropTombstones, long maxSequenceNumber) {
         this.allIterators = new ArrayList<>(iterators);
         this.dropTombstones = dropTombstones;
+        this.maxSequenceNumber = maxSequenceNumber;
 
         Comparator<InternalIterator> comparator = (a, b) -> a.peek().compareTo(b.peek());
         this.pq = new PriorityQueue<>(Math.max(1, iterators.size()), comparator);
@@ -36,8 +38,13 @@ public class PriorityQueueMergeIterator implements InternalIterator {
         advance();
     }
 
+    public PriorityQueueMergeIterator(List<InternalIterator> iterators, boolean dropTombstones) {
+        this(iterators, dropTombstones, Long.MAX_VALUE);
+    }
+
     private void advance() {
         nextEntry = null;
+        long now = System.currentTimeMillis();
 
         while (!pq.isEmpty()) {
             InternalIterator top = pq.poll();
@@ -46,15 +53,31 @@ public class PriorityQueueMergeIterator implements InternalIterator {
                 pq.offer(top);
             }
 
+            // If entry sequence number exceeds the snapshot limit, find an older version for this key
             ByteSlice currentKey = chosen.key();
+            boolean visible = chosen.sequenceNumber() <= maxSequenceNumber;
 
-            // Discard duplicate older versions from other iterators
+            // Consume duplicate older versions from other iterators
             while (!pq.isEmpty() && pq.peek().peek().key().equals(currentKey)) {
                 InternalIterator older = pq.poll();
-                older.next(); // Discard older version
+                StorageEntry olderEntry = older.next();
+                if (!visible && olderEntry.sequenceNumber() <= maxSequenceNumber) {
+                    chosen = olderEntry;
+                    visible = true;
+                }
                 if (older.hasNext()) {
                     pq.offer(older);
                 }
+            }
+
+            if (!visible) {
+                // Key had no version visible to this snapshot
+                continue;
+            }
+
+            if (chosen.isExpired(now)) {
+                // Key has expired via TTL
+                continue;
             }
 
             if (dropTombstones && chosen.isTombstone()) {

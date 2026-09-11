@@ -1,6 +1,8 @@
 package com.engine.pebble.domain.wal;
 
 import com.engine.pebble.common.ByteSlice;
+import com.engine.pebble.domain.batch.BatchOperation;
+import com.engine.pebble.domain.batch.WriteBatch;
 import com.engine.pebble.domain.model.EntryType;
 
 import java.io.IOException;
@@ -13,7 +15,7 @@ import java.util.zip.CRC32;
 
 /**
  * Write-Ahead Log (WAL) providing sequential disk append with CRC32 frame checksums.
- * Binary format: [CRC32: 4B][Type: 1B][SeqNum: 8B][KeyLen: 4B][KeyBytes][ValLen: 4B][ValBytes]
+ * Supports individual record appends and atomic multi-key WriteBatch appends.
  */
 public class WriteAheadLog implements AutoCloseable {
 
@@ -42,17 +44,27 @@ public class WriteAheadLog implements AutoCloseable {
     }
 
     public void append(EntryType type, ByteSlice key, ByteSlice value, long sequenceNumber) throws IOException {
+        append(type, key, value, sequenceNumber, 0L);
+    }
+
+    public void append(
+            EntryType type,
+            ByteSlice key,
+            ByteSlice value,
+            long sequenceNumber,
+            long expiresAtTimestamp) throws IOException {
+
         int keyLen = (key != null) ? key.length() : 0;
         int valLen = (value != null) ? value.length() : 0;
 
-        // Payload size: 1 (type) + 8 (seq) + 4 (keyLen) + keyLen + 4 (valLen) + valLen
-        int payloadSize = 1 + 8 + 4 + keyLen + 4 + valLen;
+        // Payload: 1 (type) + 8 (seq) + 8 (expiresAt) + 4 (keyLen) + keyLen + 4 (valLen) + valLen
+        int payloadSize = 1 + 8 + 8 + 4 + keyLen + 4 + valLen;
         ByteBuffer buffer = ByteBuffer.allocate(4 + payloadSize);
 
-        // Position at byte 4 to write payload first
         buffer.position(4);
         buffer.put(type.code());
         buffer.putLong(sequenceNumber);
+        buffer.putLong(expiresAtTimestamp);
         buffer.putInt(keyLen);
         if (keyLen > 0) {
             buffer.put(key.rawArray(), key.offset(), keyLen);
@@ -62,7 +74,6 @@ public class WriteAheadLog implements AutoCloseable {
             buffer.put(value.rawArray(), value.offset(), valLen);
         }
 
-        // Compute CRC32 on payload
         buffer.position(4);
         byte[] payloadBytes = new byte[payloadSize];
         buffer.get(payloadBytes);
@@ -72,7 +83,62 @@ public class WriteAheadLog implements AutoCloseable {
             crc32.update(payloadBytes);
             long checksum = crc32.getValue();
 
-            // Write CRC32 at beginning
+            buffer.position(0);
+            buffer.putInt((int) (checksum & 0xFFFFFFFFL));
+            buffer.position(0);
+
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
+            }
+
+            if (syncPolicy == SyncPolicy.ALWAYS) {
+                channel.force(false);
+            }
+        }
+    }
+
+    public void appendBatch(WriteBatch batch, long startSequenceNumber) throws IOException {
+        if (batch.isEmpty()) {
+            return;
+        }
+
+        int payloadSize = 1 + 8 + 4; // Type (BATCH) + startSeq + opCount
+        for (BatchOperation op : batch.operations()) {
+            int kLen = (op.key() != null) ? op.key().length() : 0;
+            int vLen = (op.value() != null) ? op.value().length() : 0;
+            payloadSize += (1 + 8 + 4 + kLen + 4 + vLen);
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(4 + payloadSize);
+        buffer.position(4);
+        buffer.put(EntryType.BATCH.code());
+        buffer.putLong(startSequenceNumber);
+        buffer.putInt(batch.size());
+
+        for (BatchOperation op : batch.operations()) {
+            buffer.put(op.type().code());
+            buffer.putLong(op.expiresAtTimestamp());
+            int kLen = (op.key() != null) ? op.key().length() : 0;
+            buffer.putInt(kLen);
+            if (kLen > 0) {
+                buffer.put(op.key().rawArray(), op.key().offset(), kLen);
+            }
+            int vLen = (op.value() != null) ? op.value().length() : 0;
+            buffer.putInt(vLen);
+            if (vLen > 0) {
+                buffer.put(op.value().rawArray(), op.value().offset(), vLen);
+            }
+        }
+
+        buffer.position(4);
+        byte[] payloadBytes = new byte[payloadSize];
+        buffer.get(payloadBytes);
+
+        synchronized (writeLock) {
+            crc32.reset();
+            crc32.update(payloadBytes);
+            long checksum = crc32.getValue();
+
             buffer.position(0);
             buffer.putInt((int) (checksum & 0xFFFFFFFFL));
             buffer.position(0);

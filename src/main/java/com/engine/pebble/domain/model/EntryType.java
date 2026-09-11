@@ -5,7 +5,8 @@ package com.engine.pebble.domain.model;
  */
 public enum EntryType {
     PUT((byte) 0x01),
-    DELETE((byte) 0x02); // Tombstone indicating key deletion
+    DELETE((byte) 0x02), // Tombstone indicating key deletion
+    BATCH((byte) 0x03);
 
     private final byte code;
 
@@ -21,6 +22,7 @@ public enum EntryType {
         return switch (code) {
             case 0x01 -> PUT;
             case 0x02 -> DELETE;
+            case 0x03 -> BATCH;
             default -> throw new IllegalArgumentException("Unknown EntryType code: " + code);
         };
     }

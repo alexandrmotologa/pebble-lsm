@@ -15,7 +15,7 @@ import java.util.zip.CRC32;
 
 /**
  * Scans a WAL file, validates checksums, and replays valid records into memory.
- * Gracefully handles incomplete frames at EOF resulting from system crashes.
+ * Decodes both single records and atomic WriteBatch frames.
  */
 public final class WalRecovery {
 
@@ -34,8 +34,7 @@ public final class WalRecovery {
 
         try (FileChannel channel = FileChannel.open(walPath, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             long fileSize = channel.size();
-            ByteBuffer headerBuf = ByteBuffer.allocate(4); // CRC32 header
-            ByteBuffer metaBuf = ByteBuffer.allocate(13);  // Type (1B) + SeqNum (8B) + KeyLen (4B)
+            ByteBuffer headerBuf = ByteBuffer.allocate(4);
 
             while (channel.position() < fileSize) {
                 long frameStartOffset = channel.position();
@@ -43,111 +42,198 @@ public final class WalRecovery {
                 headerBuf.clear();
                 int read = channel.read(headerBuf);
                 if (read < 4) {
-                    // Truncated header at EOF
                     truncated = true;
                     break;
                 }
                 headerBuf.flip();
                 long expectedCrc = headerBuf.getInt() & 0xFFFFFFFFL;
 
-                metaBuf.clear();
-                read = channel.read(metaBuf);
-                if (read < 13) {
-                    // Truncated metadata at EOF
+                // Read type
+                ByteBuffer typeBuf = ByteBuffer.allocate(1);
+                read = channel.read(typeBuf);
+                if (read < 1) {
                     truncated = true;
                     break;
                 }
-                metaBuf.flip();
-                byte typeCode = metaBuf.get();
-                long seqNum = metaBuf.getLong();
-                int keyLen = metaBuf.getInt();
+                typeBuf.flip();
+                byte typeCode = typeBuf.get();
 
-                if (keyLen < 0 || keyLen > 10 * 1024 * 1024) { // Sanity check: max 10MB key
-                    truncated = true;
-                    break;
-                }
-
-                ByteBuffer keyBuf = ByteBuffer.allocate(keyLen);
-                read = channel.read(keyBuf);
-                if (read < keyLen) {
-                    truncated = true;
-                    break;
-                }
-                keyBuf.flip();
-                byte[] keyBytes = keyBuf.array();
-
-                ByteBuffer valLenBuf = ByteBuffer.allocate(4);
-                read = channel.read(valLenBuf);
-                if (read < 4) {
-                    truncated = true;
-                    break;
-                }
-                valLenBuf.flip();
-                int valLen = valLenBuf.getInt();
-                if (valLen < 0 || valLen > 100 * 1024 * 1024) { // Sanity check: max 100MB value
-                    truncated = true;
-                    break;
-                }
-
-                ByteBuffer valBuf = ByteBuffer.allocate(valLen);
-                read = channel.read(valBuf);
-                if (read < valLen) {
-                    truncated = true;
-                    break;
-                }
-                valBuf.flip();
-                byte[] valBytes = valBuf.array();
-
-                // Compute CRC32 over payload: [Type][SeqNum][KeyLen][KeyBytes][ValLen][ValBytes]
                 crc32.reset();
                 crc32.update(typeCode);
 
-                ByteBuffer seqBuffer = ByteBuffer.allocate(8);
-                seqBuffer.putLong(seqNum).flip();
-                crc32.update(seqBuffer.array());
-
-                ByteBuffer keyLenBuffer = ByteBuffer.allocate(4);
-                keyLenBuffer.putInt(keyLen).flip();
-                crc32.update(keyLenBuffer.array());
-
-                if (keyLen > 0) {
-                    crc32.update(keyBytes);
-                }
-
-                ByteBuffer valLenBuffer = ByteBuffer.allocate(4);
-                valLenBuffer.putInt(valLen).flip();
-                crc32.update(valLenBuffer.array());
-
-                if (valLen > 0) {
-                    crc32.update(valBytes);
-                }
-
-                long actualCrc = crc32.getValue();
-                if (actualCrc != expectedCrc) {
-                    // Checksum mismatch
-                    if (channel.position() >= fileSize) {
-                        // At the very end of file, treat as crash truncation
+                if (typeCode == EntryType.BATCH.code()) {
+                    // Batch frame: [SeqNum: 8B][Count: 4B]
+                    ByteBuffer batchMeta = ByteBuffer.allocate(12);
+                    read = channel.read(batchMeta);
+                    if (read < 12) {
                         truncated = true;
                         break;
-                    } else {
-                        throw new CorruptedWalException("CRC32 mismatch at offset " + frameStartOffset +
-                                ": expected " + expectedCrc + ", computed " + actualCrc);
                     }
-                }
+                    batchMeta.flip();
+                    long startSeq = batchMeta.getLong();
+                    int count = batchMeta.getInt();
 
-                EntryType entryType = EntryType.fromCode(typeCode);
-                ByteSlice keySlice = ByteSlice.of(keyBytes);
-                ByteSlice valSlice = (entryType == EntryType.DELETE) ? ByteSlice.EMPTY : ByteSlice.of(valBytes);
+                    crc32.update(batchMeta.array(), 0, 12);
 
-                records.add(new WalRecord(entryType, seqNum, keySlice, valSlice));
-                if (seqNum > maxSeqNum) {
-                    maxSeqNum = seqNum;
+                    List<WalRecord> batchRecords = new ArrayList<>(count);
+                    boolean batchCorrupt = false;
+
+                    for (int i = 0; i < count; i++) {
+                        ByteBuffer opMeta = ByteBuffer.allocate(13); // OpType (1B) + ExpiresAt (8B) + KeyLen (4B)
+                        read = channel.read(opMeta);
+                        if (read < 13) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        opMeta.flip();
+                        byte opCode = opMeta.get();
+                        long expiresAt = opMeta.getLong();
+                        int keyLen = opMeta.getInt();
+
+                        crc32.update(opMeta.array(), 0, 13);
+
+                        if (keyLen < 0 || keyLen > 10 * 1024 * 1024) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        ByteBuffer keyBuf = ByteBuffer.allocate(keyLen);
+                        read = channel.read(keyBuf);
+                        if (read < keyLen) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        keyBuf.flip();
+                        byte[] keyBytes = keyBuf.array();
+                        if (keyLen > 0) crc32.update(keyBytes);
+
+                        ByteBuffer valLenBuf = ByteBuffer.allocate(4);
+                        read = channel.read(valLenBuf);
+                        if (read < 4) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        valLenBuf.flip();
+                        int valLen = valLenBuf.getInt();
+                        crc32.update(valLenBuf.array(), 0, 4);
+
+                        if (valLen < 0 || valLen > 100 * 1024 * 1024) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        ByteBuffer valBuf = ByteBuffer.allocate(valLen);
+                        read = channel.read(valBuf);
+                        if (read < valLen) {
+                            batchCorrupt = true;
+                            break;
+                        }
+                        valBuf.flip();
+                        byte[] valBytes = valBuf.array();
+                        if (valLen > 0) crc32.update(valBytes);
+
+                        long currentSeq = startSeq + i;
+                        EntryType opType = EntryType.fromCode(opCode);
+                        ByteSlice key = ByteSlice.of(keyBytes);
+                        ByteSlice val = (opType == EntryType.DELETE) ? ByteSlice.EMPTY : ByteSlice.of(valBytes);
+                        batchRecords.add(new WalRecord(opType, currentSeq, key, val, expiresAt));
+                    }
+
+                    if (batchCorrupt) {
+                        truncated = true;
+                        break;
+                    }
+
+                    long actualCrc = crc32.getValue();
+                    if (actualCrc != expectedCrc) {
+                        if (channel.position() >= fileSize) {
+                            truncated = true;
+                            break;
+                        } else {
+                            throw new CorruptedWalException("CRC32 mismatch in batch at offset " + frameStartOffset);
+                        }
+                    }
+
+                    records.addAll(batchRecords);
+                    if (startSeq + count - 1 > maxSeqNum) {
+                        maxSeqNum = startSeq + count - 1;
+                    }
+                    lastValidOffset = channel.position();
+
+                } else {
+                    // Individual frame: [SeqNum: 8B][ExpiresAt: 8B][KeyLen: 4B]
+                    ByteBuffer metaBuf = ByteBuffer.allocate(20);
+                    read = channel.read(metaBuf);
+                    if (read < 20) {
+                        truncated = true;
+                        break;
+                    }
+                    metaBuf.flip();
+                    long seqNum = metaBuf.getLong();
+                    long expiresAt = metaBuf.getLong();
+                    int keyLen = metaBuf.getInt();
+
+                    crc32.update(metaBuf.array(), 0, 20);
+
+                    if (keyLen < 0 || keyLen > 10 * 1024 * 1024) {
+                        truncated = true;
+                        break;
+                    }
+                    ByteBuffer keyBuf = ByteBuffer.allocate(keyLen);
+                    read = channel.read(keyBuf);
+                    if (read < keyLen) {
+                        truncated = true;
+                        break;
+                    }
+                    keyBuf.flip();
+                    byte[] keyBytes = keyBuf.array();
+                    if (keyLen > 0) crc32.update(keyBytes);
+
+                    ByteBuffer valLenBuf = ByteBuffer.allocate(4);
+                    read = channel.read(valLenBuf);
+                    if (read < 4) {
+                        truncated = true;
+                        break;
+                    }
+                    valLenBuf.flip();
+                    int valLen = valLenBuf.getInt();
+                    crc32.update(valLenBuf.array(), 0, 4);
+
+                    if (valLen < 0 || valLen > 100 * 1024 * 1024) {
+                        truncated = true;
+                        break;
+                    }
+                    ByteBuffer valBuf = ByteBuffer.allocate(valLen);
+                    read = channel.read(valBuf);
+                    if (read < valLen) {
+                        truncated = true;
+                        break;
+                    }
+                    valBuf.flip();
+                    byte[] valBytes = valBuf.array();
+                    if (valLen > 0) crc32.update(valBytes);
+
+                    long actualCrc = crc32.getValue();
+                    if (actualCrc != expectedCrc) {
+                        if (channel.position() >= fileSize) {
+                            truncated = true;
+                            break;
+                        } else {
+                            throw new CorruptedWalException("CRC32 mismatch at offset " + frameStartOffset);
+                        }
+                    }
+
+                    EntryType entryType = EntryType.fromCode(typeCode);
+                    ByteSlice key = ByteSlice.of(keyBytes);
+                    ByteSlice val = (entryType == EntryType.DELETE) ? ByteSlice.EMPTY : ByteSlice.of(valBytes);
+
+                    records.add(new WalRecord(entryType, seqNum, key, val, expiresAt));
+                    if (seqNum > maxSeqNum) {
+                        maxSeqNum = seqNum;
+                    }
+                    lastValidOffset = channel.position();
                 }
-                lastValidOffset = channel.position();
             }
 
             if (truncated) {
-                // Truncate file at the last cleanly read record offset
                 channel.truncate(lastValidOffset);
                 channel.force(false);
             }

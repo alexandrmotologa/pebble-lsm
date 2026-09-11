@@ -190,7 +190,8 @@ public class CompactionManager implements AutoCloseable {
                         path,
                         fileNum,
                         options.sstableTargetBlockSize(),
-                        fileEntries.size()
+                        fileEntries.size(),
+                        options.compressionType()
                 );
                 writer.write(fileEntries.iterator());
                 SSTableReader reader = SSTableReader.open(path, fileNum, targetLevel, blockCache);

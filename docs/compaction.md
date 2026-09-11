@@ -1,10 +1,10 @@
 # Compaction mechanics
 
-This document details the leveled compaction process used by PebbleLSM to limit read amplification and reclaim disk space.
+This document details the leveled compaction process used by PebbleLSM to limit read amplification, purge expired records, and reclaim disk space.
 
 ## Why compaction is required
 
-Because the engine writes updates and deletes as new entries rather than in-place modifications, stale versions and delete tombstones accumulate on disk over time. Without compaction:
+Because the engine writes updates and deletes as append-only records rather than in-place modifications, stale versions, expired records, and delete tombstones accumulate on disk over time. Without compaction:
 
 - Disk space usage grows indefinitely.
 - Point lookups and range scans must inspect multiple SSTable files, increasing read latency.
@@ -41,14 +41,18 @@ L2 (Non-overlapping):  [a - c]  [d - g]  [h - k]  [l - p]  [q - u]  [v - z]
    - A `PriorityQueueMergeIterator` streams through all input SSTables in sorted key order.
    - For duplicate keys, only the newest entry (highest sequence number) is retained; older versions are discarded.
 
-4. **Tombstone elimination rule**:
+4. **TTL expiration pruning**:
+   - For each candidate entry, the compaction process checks its expiration timestamp (`expiresAtTimestamp`).
+   - If `expiresAtTimestamp > 0` and the timestamp is less than or equal to current system time (`now`), the record is dropped immediately. Expired data does not propagate to deeper levels.
+
+5. **Tombstone elimination rule**:
    - A delete tombstone cannot be dropped if older versions of that key might still reside in deeper levels.
    - A tombstone is safely dropped only during compaction into the maximum level (L2), or when the compaction manager verifies that no deeper level contains the key.
 
-5. **Emitting new SSTables**:
-   - The merged stream is written to new SSTable files targeting a maximum file size (default: 2 MB per file).
+6. **Emitting new SSTables**:
+   - The merged stream is written to new SSTable files targeting a maximum file size (default: 2 MB per file), optionally using LZ4 block compression.
    - Each new file is registered at the target level.
 
-6. **Atomic manifest commit**:
+7. **Atomic manifest commit**:
    - The `ManifestManager` appends a version edit record to the manifest log, listing the newly added SSTable file IDs and the obsolete SSTable file IDs.
    - Once the manifest write completes and syncs, obsolete SSTables are safely unlinked from disk.
