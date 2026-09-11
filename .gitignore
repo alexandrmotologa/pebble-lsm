@@ -11,3 +11,4 @@ test-data/
 *.sstable
 *.wal
 *.manifest
+dependency-reduced-pom.xml
