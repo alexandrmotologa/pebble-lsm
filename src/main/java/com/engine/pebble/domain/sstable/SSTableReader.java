@@ -23,6 +23,7 @@ public class SSTableReader implements AutoCloseable {
     private final Path path;
     private final long fileNumber;
     private final int level;
+    private final long fileSize;
     private final FileChannel channel;
     private final Footer footer;
     private final BlockIndex blockIndex;
@@ -33,6 +34,7 @@ public class SSTableReader implements AutoCloseable {
             Path path,
             long fileNumber,
             int level,
+            long fileSize,
             FileChannel channel,
             Footer footer,
             BlockIndex blockIndex,
@@ -42,6 +44,7 @@ public class SSTableReader implements AutoCloseable {
         this.path = path;
         this.fileNumber = fileNumber;
         this.level = level;
+        this.fileSize = fileSize;
         this.channel = channel;
         this.footer = footer;
         this.blockIndex = blockIndex;
@@ -57,6 +60,7 @@ public class SSTableReader implements AutoCloseable {
 
         FileChannel channel = FileChannel.open(path, StandardOpenOption.READ);
         try {
+            long fileSize = channel.size();
             Footer footer = Footer.readFrom(channel);
 
             // Read sparse index
@@ -73,7 +77,7 @@ public class SSTableReader implements AutoCloseable {
             bloomBuf.flip();
             BloomFilter bloom = BloomFilter.deserialize(bloomBuf);
 
-            return new SSTableReader(path, fileNumber, level, channel, footer, index, bloom, blockCache);
+            return new SSTableReader(path, fileNumber, level, fileSize, channel, footer, index, bloom, blockCache);
         } catch (Exception e) {
             channel.close();
             throw e;
@@ -136,7 +140,7 @@ public class SSTableReader implements AutoCloseable {
         return new SSTableFileIterator();
     }
 
-    public SSTableMetadata metadata() throws IOException {
+    public SSTableMetadata metadata() {
         return new SSTableMetadata(
                 fileNumber,
                 path,
@@ -144,7 +148,7 @@ public class SSTableReader implements AutoCloseable {
                 footer.entryCount(),
                 footer.minKey(),
                 footer.maxKey(),
-                channel.size()
+                fileSize
         );
     }
 
