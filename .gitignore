@@ -1,0 +1,13 @@
+target/
+*.class
+*.log
+*.iml
+.idea/
+.vscode/
+.DS_Store
+data/
+data-*/
+test-data/
+*.sstable
+*.wal
+*.manifest
