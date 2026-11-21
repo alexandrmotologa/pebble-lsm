@@ -17,11 +17,20 @@ import java.util.concurrent.Callable;
  */
 @Command(
         name = "pebble",
-        mixinStandardHelpOptions = true,
+        mixinStandardHelpOptions = false,
         version = "PebbleLSM 1.0.0",
         description = "Embedded LSM-Tree Key-Value Storage Engine CLI"
 )
 public class PebbleCli implements Callable<Integer> {
+
+    @Option(names = {"-h", "--help"}, usageHelp = true, description = "Show this help message and exit.")
+    private boolean helpRequested;
+
+    @Option(names = {"-v", "-V", "--version"}, versionHelp = true, description = "Print version information and exit.")
+    private boolean versionRequested;
+
+    @CommandLine.Spec
+    private CommandLine.Model.CommandSpec spec;
 
     @Option(names = {"-p", "--path"}, description = "Database storage directory path", defaultValue = "./pebble-data")
     private Path dbPath;
@@ -132,6 +141,16 @@ public class PebbleCli implements Callable<Integer> {
             server.start();
             System.out.println("PebbleLSM RESP Server running on port " + port + ". Press Ctrl+C to stop.");
             Thread.currentThread().join();
+        }
+        return 0;
+    }
+
+    @Command(name = "version", description = "Print version information and exit.")
+    public int version() {
+        if (spec != null && spec.commandLine() != null) {
+            spec.commandLine().getOut().println("PebbleLSM 1.0.0");
+        } else {
+            System.out.println("PebbleLSM 1.0.0");
         }
         return 0;
     }

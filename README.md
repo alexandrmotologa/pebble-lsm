@@ -83,6 +83,10 @@ Head-to-head benchmark evaluation under 100,000 sequential writes and 50,000 ran
 
 ## Visual Interfaces & Tooling
 
+<p align="center">
+  <img src="docs/images/pebble_lsm_demo.gif?raw=true" alt="PebbleLSM Storage Engine Interfaces Demo" width="100%" />
+</p>
+
 ### Diagnostic Storage Visualizer (TUI)
 
 Real-time terminal HUD displaying memory consumption, level distribution, cache hit ratios, and background compaction status:
@@ -94,7 +98,7 @@ Real-time terminal HUD displaying memory consumption, level distribution, cache 
 Run the live visualizer:
 
 ```bash
-java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar tui --path ./data
+java -jar target/pebble-lsm-1.0.0.jar tui --path ./data
 ```
 
 ### Interactive REPL Shell
@@ -108,7 +112,7 @@ Directly query, write, scan, and inspect the database engine through an interact
 Launch the shell:
 
 ```bash
-java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar shell --path ./data
+java -jar target/pebble-lsm-1.0.0.jar shell --path ./data
 ```
 
 Supported shell commands:
@@ -132,7 +136,7 @@ PebbleLSM runs as a standalone network key-value store compatible with Redis:
 Start the server on port 6379:
 
 ```bash
-java -jar target/pebble-lsm-1.0.0-SNAPSHOT.jar server --port 6379 --path ./data
+java -jar target/pebble-lsm-1.0.0.jar server --port 6379 --path ./data
 ```
 
 Connect using standard tools such as `redis-cli`:
@@ -169,7 +173,7 @@ cd pebble-lsm
 mvn clean package
 ```
 
-The build compiles the engine and produces a shaded standalone JAR file at `target/pebble-lsm-1.0.0-SNAPSHOT.jar`.
+The build compiles the engine and produces a shaded standalone JAR file at `target/pebble-lsm-1.0.0.jar`.
 
 ### Embedded Java API
 
