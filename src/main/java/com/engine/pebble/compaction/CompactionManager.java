@@ -49,7 +49,7 @@ public class CompactionManager implements AutoCloseable {
     }
 
     public void maybeTriggerCompactionAsync() {
-        if (shouldCompact()) {
+        if (shouldCompact() && !isCompacting.get()) {
             compactionExecutor.submit(() -> {
                 try {
                     compact();
@@ -69,14 +69,11 @@ public class CompactionManager implements AutoCloseable {
     }
 
     public void compact() throws IOException {
-        if (!compactionLock.tryLock()) {
-            // Already running a compaction cycle
-            return;
-        }
+        compactionLock.lock();
         isCompacting.set(true);
         try {
             // Check L0 -> L1 compaction
-            if (manifestManager.getL0Count() >= options.l0CompactionThreshold()) {
+            if (manifestManager.getL0Count() > 0) {
                 compactL0ToL1();
             }
 

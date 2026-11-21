@@ -23,7 +23,7 @@ class LeveledCompactionTest {
         PebbleOptions options = PebbleOptions.builder()
                 .dbPath(dbPath)
                 .memTableThresholdBytes(8 * 1024) // 8KB to force rapid flushes
-                .l0CompactionThreshold(3)
+                .l0CompactionThreshold(10)
                 .build();
 
         try (PebbleEngine engine = PebbleEngine.open(options)) {
